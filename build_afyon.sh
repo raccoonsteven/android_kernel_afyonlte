@@ -37,7 +37,20 @@ echo -e "${bldblu}
       Building ZERO Kernel By DM47021 From Source
 ${txtrst}" 
 
-make -j64 ARCH=arm CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi- msm8226-sec_defconfig VARIANT_DEFCONFIG=msm8926-sec_afyonltetmo_defconfig
+
+echo""
+echo -e "${bldblu} 
+      Removing Old .config files
+${txtrst}" 
+rm -rf .config
+
+echo""
+echo -e "${bldblu} 
+      Setting up Zero_Configuration
+${txtrst}" 
+cp zero_afyonlte_defconfig .config
+
+make -j64 ARCH=arm CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
 make -j64 ARCH=arm CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
 
 echo -e "${bldgrn} 
