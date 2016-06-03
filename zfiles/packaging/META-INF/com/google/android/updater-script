@@ -1,0 +1,18 @@
+ui_print(" ZERO Kernel ");
+ui_print(" For the Samsung Galaxy Avant");
+ui_print("");
+ui_print("");
+ui_print(" Installing New Kernel");
+ui_print("");
+ui_print("        Flashing Kernel"); 
+package_extract_file("boot.img", "/dev/block/mmcblk0p14");
+ui_print("        Successfully Installed"); 
+ui_print("");
+mount("ext4", "EMMC", "/dev/block/platform/msm_sdcc.1/by-name/system", "/system");
+ui_print("Extracting files to /system");
+package_extract_dir("system", "/system");
+ui_print("");
+show_progress(0.100000, 0);
+unmount("/system");
+ui_print(" Done ");
+

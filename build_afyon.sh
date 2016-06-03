@@ -18,6 +18,12 @@ ${txtrst}"
 
 make mrproper
 
+loc=~/.gnome2/nautilus-scripts/SignScripts/
+date=$(date +%Y%m%d-%H:%M:%S)
+
+# Check for a log directory in ~/ and create if its not there
+[ -d ~/logs ] || mkdir -p ~/logs
+
 echo""
 echo -e "${bldgrn} 
       Source is Sanitary 
@@ -36,7 +42,9 @@ echo -e "${bldgrn}
       Kernel Built Sucessfully!!
 ${txtrst}" 
 
-#Build dt.img
+find -name '*.ko' -exec cp -av {} zfiles/packaging/system/lib/modules/ \;
+
+# Build dt.img
 echo""
 echo -e "${bldcya} 
       Building new dt.img
@@ -44,6 +52,17 @@ echo -e "${bldcya}
 ${txtrst}" 
 
 ./dtbTool -o arch/arm/boot/dt.img -s 2048 -p ./scripts/dtc/ ./arch/arm/boot/
+
+# Copy Prequisites for making Boot.img
+cp arch/arm/boot/dt.img zfiles/
+cp arch/arm/boot/zImage zfiles/
+
+
+echo""
+echo -e "${bldcya} 
+      DONT FORGET TO RUN ./mkbootzip.pl ramdisk_stk
+      This will result in a twrp flashable kernel zip
+${txtrst}" 
 
 # Wait for user input
 echo""
