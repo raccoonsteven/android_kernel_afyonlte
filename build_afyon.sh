@@ -1,5 +1,7 @@
 #!/bin/bash 
 
+export version=ZERO_KERNEL-0.1d-ANK3
+
 # Colorize and add text parameters
 red=$(tput setaf 1) # red
 grn=$(tput setaf 2) # green
@@ -16,7 +18,7 @@ echo -e "${bldred}
      Cleaning Build Directory 
 ${txtrst}"
 
-rm -rf zero-krnl.zip
+rm -rf ./$version-DM47021.zip
 
 make mrproper
 
@@ -81,8 +83,6 @@ echo""
 echo -e "${bldcya} 
       Building Boot.img
 ${txtrst}" 
-
-export version=ZERO_KERNEL-0.1d-ANK3
 
 cd zfiles
 ./mkbootzip.pl ramdisk/stock 
