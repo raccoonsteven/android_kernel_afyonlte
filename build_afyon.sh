@@ -82,6 +82,8 @@ echo -e "${bldcya}
       Building Boot.img
 ${txtrst}" 
 
+export version=ZERO_KERNEL-0.1d-ANK3
+
 cd zfiles
 ./mkbootzip.pl ramdisk/stock 
 
@@ -93,7 +95,7 @@ ${txtrst}"
 
 cd ../
 
-cp zfiles/zero-krnl.zip ./zero-krnl.zip
+cp zfiles/zero-krnl.zip ./$version-DM47021.zip
 
 echo""
 echo -e "${bldcya} 
