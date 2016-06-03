@@ -16,6 +16,8 @@ echo -e "${bldred}
      Cleaning Build Directory 
 ${txtrst}"
 
+rm -rf zero-krnl.zip
+
 make mrproper
 
 loc=~/.gnome2/nautilus-scripts/SignScripts/
@@ -42,6 +44,10 @@ echo -e "${bldgrn}
       Kernel Built Sucessfully!!
 ${txtrst}" 
 
+echo -e "${bldgrn} 
+      Kernel Modules can be found in zfiles/packaging/system/lib/modules
+${txtrst}"
+
 find -name '*.ko' -exec cp -av {} zfiles/packaging/system/lib/modules/ \;
 
 # Build dt.img
@@ -60,8 +66,26 @@ cp arch/arm/boot/zImage zfiles/
 
 echo""
 echo -e "${bldcya} 
-      DONT FORGET TO RUN ./mkbootzip.pl ramdisk_stk
-      This will result in a twrp flashable kernel zip
+      Building Boot.img
+${txtrst}" 
+
+cd zfiles
+./mkbootzip.pl ramdisk/stock 
+
+echo""
+echo -e "${bldcya} 
+      Boot.img built
+      Building Zipfile
+${txtrst}" 
+
+cd ../
+
+cp zfiles/zero-krnl.zip ./zero-krnl.zip
+
+echo""
+echo -e "${bldcya} 
+    Flashable zip created 
+    zero-krnl.zip in the root of the build dir
 ${txtrst}" 
 
 # Wait for user input
