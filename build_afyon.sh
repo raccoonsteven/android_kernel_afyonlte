@@ -70,7 +70,7 @@ echo -e "${bldcya}
       The end result will be dt.img  in arch/arm/boot 
 ${txtrst}" 
 
-./dtbTool -o arch/arm/boot/dt.img -s 2048 -p ./scripts/dtc/ ./arch/arm/boot/
+./bin/dtbTool -o arch/arm/boot/dt.img -s 2048 -p ./scripts/dtc/ ./arch/arm/boot/
 
 # Copy Prequisites for making Boot.img
 cp arch/arm/boot/dt.img zfiles/
@@ -100,6 +100,15 @@ echo -e "${bldcya}
     Flashable zip created 
     zero-krnl.zip in the root of the build dir
 ${txtrst}" 
+
+echo""
+echo -e "${bldred} 
+     Cleaning Up Working Dirs
+${txtrst}"
+
+rm -rf zfiles/packaging/boot.img 
+rm -rf zfiles/zImage 
+rm -rf zfiles/zero-krnl.zip
 
 # Wait for user input
 echo""
