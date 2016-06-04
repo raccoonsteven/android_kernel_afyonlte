@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-export version=ZERO_KERNEL-0.1d-ANK3
+export version=ZERO_KERNEL-0.2d-ANK3
 
 # Colorize and add text parameters
 red=$(tput setaf 1) # red
@@ -85,7 +85,7 @@ echo -e "${bldcya}
 ${txtrst}" 
 
 cd zfiles
-./mkbootzip.pl ramdisk/stock 
+./mkbootzip.pl ramdisk/zero
 
 echo""
 echo -e "${bldcya} 
