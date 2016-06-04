@@ -1307,5 +1307,5 @@ service sysprof /system/bin/sysprof -f /data/local/tmp/.sysprofctrl -o /data/loc
     disabled
     oneshot
 
-    setprop ro.securestorage.support=false
+    
 
