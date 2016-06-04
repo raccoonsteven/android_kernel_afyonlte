@@ -36,23 +36,24 @@
 #include <linux/mfd/pm8xxx/misc.h>
 #include <linux/qpnp/qpnp-adc.h>
 
+#include <mach/board.h>
 #include <mach/msm_smd.h>
 #include <mach/msm_iomap.h>
 #include <mach/subsystem_restart.h>
 #include <mach/subsystem_notif.h>
 
+#include <asm/system_info.h>
+
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #include "wcnss_prealloc.h"
-#endif
-
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-#include <mach/board.h>
 #endif
 
 #define DEVICE "wcnss_wlan"
 #define CTRL_DEVICE "wcnss_ctrl"
 #define VERSION "1.01"
 #define WCNSS_PIL_DEVICE "wcnss"
+
+#define WAIT_FOR_CBC_IND     2
 
 /* module params */
 #define WCNSS_CONFIG_UNSPECIFIED (-1)
@@ -149,21 +150,19 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define MSM_PRONTO_PLL_BASE				0xfb21b1c0
 #define PRONTO_PLL_STATUS_OFFSET		0x1c
 
-#define MSM_PRONTO_MCU_BASE							0xfb080c00
-#define MCU_APB2PHY_STATUS_OFFSET				0xec	
-#define MCU_CBR_CCAHB_ERR_OFFSET					0x380	
-#define MCU_CBR_CAHB_ERR_OFFSET					0x384	
-#define MCU_CBR_CCAHB_TIMEOUT_OFFSET			0x388	
-#define MCU_CBR_CAHB_TIMEOUT_OFFSET			0x38c	
-#define MCU_DBR_CDAHB_ERR_OFFSET					0x390	
-#define MCU_DBR_DAHB_ERR_OFFSET					0x394	
-#define MCU_DBR_CDAHB_TIMEOUT_OFFSET			0x398	
-#define MCU_DBR_DAHB_TIMEOUT_OFFSET			0x39c	
-#define MCU_FDBR_CDAHB_ERR_OFFSET				0x3a0	
-#define MCU_FDBR_FDAHB_ERR_OFFSET				0x3a4	
-#define MCU_FDBR_CDAHB_TIMEOUT_OFFSET		0x3a8	
+#define MSM_PRONTO_MCU_BASE			0xfb080c00
+#define MCU_CBR_CCAHB_ERR_OFFSET		0x380
+#define MCU_CBR_CAHB_ERR_OFFSET			0x384
+#define MCU_CBR_CCAHB_TIMEOUT_OFFSET		0x388
+#define MCU_CBR_CAHB_TIMEOUT_OFFSET		0x38c
+#define MCU_DBR_CDAHB_ERR_OFFSET		0x390
+#define MCU_DBR_DAHB_ERR_OFFSET			0x394
+#define MCU_DBR_CDAHB_TIMEOUT_OFFSET		0x398
+#define MCU_DBR_DAHB_TIMEOUT_OFFSET		0x39c
+#define MCU_FDBR_CDAHB_ERR_OFFSET		0x3a0
+#define MCU_FDBR_FDAHB_ERR_OFFSET		0x3a4
+#define MCU_FDBR_CDAHB_TIMEOUT_OFFSET		0x3a8
 #define MCU_FDBR_FDAHB_TIMEOUT_OFFSET		0x3ac
-
 
 #define MSM_PRONTO_TXP_STATUS           0xfb08040c
 #define MSM_PRONTO_TXP_PHY_ABORT        0xfb080488
@@ -192,6 +191,7 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define WCNSS_USR_HAS_CAL_DATA    (WCNSS_USR_CTRL_MSG_START + 2)
 
 #define MAC_ADDRESS_STR "%02x:%02x:%02x:%02x:%02x:%02x"
+
 /* message types */
 #define WCNSS_CTRL_MSG_START	0x01000000
 #define	WCNSS_VERSION_REQ             (WCNSS_CTRL_MSG_START + 0)
@@ -205,10 +205,12 @@ static DEFINE_SPINLOCK(reg_spinlock);
 #define	WCNSS_VBATT_LEVEL_IND         (WCNSS_CTRL_MSG_START + 8)
 #define	WCNSS_BUILD_VER_REQ           (WCNSS_CTRL_MSG_START + 9)
 #define	WCNSS_BUILD_VER_RSP           (WCNSS_CTRL_MSG_START + 10)
+#define	WCNSS_PM_CONFIG_REQ           (WCNSS_CTRL_MSG_START + 11)
+#define	WCNSS_CBC_COMPLETE_IND        (WCNSS_CTRL_MSG_START + 12)
 
 /* max 20mhz channel count */
 #define WCNSS_MAX_CH_NUM			45
-#define WCNSS_MAX_PIL_RETRY		3
+#define WCNSS_MAX_PIL_RETRY			3
 
 #define VALID_VERSION(version) \
 	((strncmp(version, "INVALID", WCNSS_VERSION_LEN)) ? 1 : 0)
@@ -242,6 +244,13 @@ static struct wcnss_pmic_dump wcnss_pmic_reg_dump[] = {
 	{"S4", 0x1E8},
 	{"LVS7", 0x06C},
 	{"LVS1", 0x060},
+};
+
+static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,
+				void *ss_handle);
+
+static struct notifier_block wnb = {
+	.notifier_call = wcnss_notif_cb,
 };
 
 #define NVBIN_FILE "wlan/prima/WCNSS_qcom_wlan_nv.bin"
@@ -372,6 +381,7 @@ static struct {
 	struct delayed_work wcnss_work;
 	struct delayed_work vbatt_work;
 	struct work_struct wcnssctrl_version_work;
+	struct work_struct wcnss_pm_config_work;
 	struct work_struct wcnssctrl_nvbin_dnld_work;
 	struct work_struct wcnssctrl_rx_work;
 	struct wake_lock wcnss_wake_lock;
@@ -388,8 +398,8 @@ static struct {
 	void __iomem *alarms_txctl;
 	void __iomem *alarms_tactl;
 	void __iomem *fiq_reg;
-	int	ssr_boot;
 	int	nv_downloaded;
+	int	is_cbc_done;
 	unsigned char *fw_cal_data;
 	unsigned char *user_cal_data;
 	int	fw_cal_rcvd;
@@ -410,10 +420,11 @@ static struct {
 	struct qpnp_adc_tm_btm_param vbat_monitor_params;
 	struct qpnp_adc_tm_chip *adc_tm_dev;
 	struct mutex vbat_monitor_mutex;
-        void *wcnss_notif_hdle;
 	u16 unsafe_ch_count;
 	u16 unsafe_ch_list[WCNSS_MAX_CH_NUM];
+	void *wcnss_notif_hdle;
 	u8 is_shutdown;
+	const char *nv_file_name;
 } *penv = NULL;
 
 static ssize_t wcnss_wlan_macaddr_store(struct device *dev,
@@ -459,7 +470,6 @@ static ssize_t wcnss_wlan_macaddr_show(struct device *dev,
 
 static DEVICE_ATTR(wcnss_mac_addr, S_IRUSR | S_IWUSR,
 	wcnss_wlan_macaddr_show, wcnss_wlan_macaddr_store);
-
 
 static ssize_t wcnss_serial_number_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -587,48 +597,53 @@ void wcnss_pronto_log_debug_regs(void)
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_SPARE_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_SPARE %08x\n", reg);
+	pr_info_ratelimited("%s:  PRONTO_PMU_SPARE %08x\n", __func__, reg);
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_COM_CPU_CBCR_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_COM_CPU_CBCR %08x\n", reg);
+	pr_info_ratelimited("%s:  PRONTO_PMU_COM_CPU_CBCR %08x\n",
+						__func__, reg);
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_COM_AHB_CBCR_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_COM_AHB_CBCR %08x\n", reg);
+	pr_info_ratelimited("%s:  PRONTO_PMU_COM_AHB_CBCR %08x\n",
+						__func__, reg);
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_CFG_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_CFG %08x\n", reg);
+	pr_info_ratelimited("%s:  PRONTO_PMU_CFG %08x\n", __func__, reg);
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_COM_CSR_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_COM_CSR %08x\n", reg);
+	pr_info_ratelimited("%s:  PRONTO_PMU_COM_CSR %08x\n",
+						__func__, reg);
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_SOFT_RESET_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_SOFT_RESET %08x\n", reg);
+	pr_info_ratelimited("%s:  PRONTO_PMU_SOFT_RESET %08x\n",
+						__func__, reg);
 
 	reg_addr = penv->pronto_saw2_base + PRONTO_SAW2_SPM_STS_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_SAW2_SPM_STS %08x\n", reg);
+	pr_info_ratelimited("%s: PRONTO_SAW2_SPM_STS %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_pll_base + PRONTO_PLL_STATUS_OFFSET;
 	reg = readl_relaxed(reg_addr);
 	pr_err("PRONTO_PLL_STATUS %08x\n", reg);
-	
+
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_CPU_AHB_CMD_RCGR_OFFSET;
 	reg4 = readl_relaxed(reg_addr);
 	pr_err("PMU_CPU_CMD_RCGR %08x\n", reg4);
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_COM_GDSCR_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("PRONTO_PMU_COM_GDSCR %08x\n", reg);
-	
+	pr_info_ratelimited("%s:  PRONTO_PMU_COM_GDSCR %08x\n",
+						__func__, reg);
 	reg >>= 31;
 
 	if (!reg) {
-		pr_err("Cannot log, Pronto common SS is power collapsed\n");
+		pr_info_ratelimited("%s:  Cannot log, Pronto common SS is power collapsed\n",
+				__func__);
 		return;
 	}
 	reg &= ~(PRONTO_PMU_COM_GDSCR_SW_COLLAPSE
@@ -642,31 +657,31 @@ void wcnss_pronto_log_debug_regs(void)
 
 	reg_addr = penv->pronto_a2xb_base + A2XB_CFG_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	 pr_err("A2XB_CFG_OFFSET %08x\n", reg);
+	pr_info_ratelimited("%s: A2XB_CFG_OFFSET %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_a2xb_base + A2XB_INT_SRC_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("A2XB_INT_SRC_OFFSET %08x\n", reg);
+	pr_info_ratelimited("%s: A2XB_INT_SRC_OFFSET %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_a2xb_base + A2XB_ERR_INFO_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("A2XB_ERR_INFO_OFFSET %08x\n", reg);
+	pr_info_ratelimited("%s: A2XB_ERR_INFO_OFFSET %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_ccpu_base + CCU_PRONTO_INVALID_ADDR_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("CCU_CCPU_INVALID_ADDR %08x\n", reg);
+	pr_info_ratelimited("%s: CCU_CCPU_INVALID_ADDR %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_ccpu_base + CCU_PRONTO_LAST_ADDR0_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("CCU_CCPU_LAST_ADDR0 %08x\n", reg);
+	pr_info_ratelimited("%s: CCU_CCPU_LAST_ADDR0 %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_ccpu_base + CCU_PRONTO_LAST_ADDR1_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("CCU_CCPU_LAST_ADDR1 %08x\n", reg);
+	pr_info_ratelimited("%s: CCU_CCPU_LAST_ADDR1 %08x\n", __func__, reg);
 
 	reg_addr = penv->pronto_ccpu_base + CCU_PRONTO_LAST_ADDR2_OFFSET;
 	reg = readl_relaxed(reg_addr);
-	pr_err("CCU_CCPU_LAST_ADDR2 %08x\n", reg);
+	pr_info_ratelimited("%s: CCU_CCPU_LAST_ADDR2 %08x\n", __func__, reg);
 
 	tst_addr = penv->pronto_a2xb_base + A2XB_TSTBUS_OFFSET;
 	tst_ctrl_addr = penv->pronto_a2xb_base + A2XB_TSTBUS_CTRL_OFFSET;
@@ -676,21 +691,24 @@ void wcnss_pronto_log_debug_regs(void)
 	reg = reg | WCNSS_TSTBUS_CTRL_EN | WCNSS_TSTBUS_CTRL_RDFIFO;
 	writel_relaxed(reg, tst_ctrl_addr);
 	reg = readl_relaxed(tst_addr);
-	pr_err("Read data FIFO testbus %08x\n", reg);
+	pr_info_ratelimited("%s:  Read data FIFO testbus %08x\n",
+					__func__, reg);
 
 	/*  command FIFO */
 	reg = 0;
 	reg = reg | WCNSS_TSTBUS_CTRL_EN | WCNSS_TSTBUS_CTRL_CMDFIFO;
 	writel_relaxed(reg, tst_ctrl_addr);
 	reg = readl_relaxed(tst_addr);
-	pr_err("Command FIFO testbus %08x\n", reg);
+	pr_info_ratelimited("%s:  Command FIFO testbus %08x\n",
+					__func__, reg);
 
 	/*  write data FIFO */
 	reg = 0;
 	reg = reg | WCNSS_TSTBUS_CTRL_EN | WCNSS_TSTBUS_CTRL_WRFIFO;
 	writel_relaxed(reg, tst_ctrl_addr);
 	reg = readl_relaxed(tst_addr);
-	pr_err("AXIM SEL CFG0 testbus %08x\n", reg);
+	pr_info_ratelimited("%s:  Rrite data FIFO testbus %08x\n",
+					__func__, reg);
 
 	/*   AXIM SEL CFG0 */
 	reg = 0;
@@ -707,7 +725,8 @@ void wcnss_pronto_log_debug_regs(void)
 				WCNSS_TSTBUS_CTRL_AXIM_CFG1;
 	writel_relaxed(reg, tst_ctrl_addr);
 	reg = readl_relaxed(tst_addr);
-	pr_err("AXIM SEL CFG1 testbus %08x\n", reg);
+	pr_info_ratelimited("%s:  AXIM SEL CFG1 testbus %08x\n",
+					__func__, reg);
 
 	/*   CTRL SEL CFG0 */
 	reg = 0;
@@ -715,7 +734,8 @@ void wcnss_pronto_log_debug_regs(void)
 		WCNSS_TSTBUS_CTRL_CTRL_CFG0;
 	writel_relaxed(reg, tst_ctrl_addr);
 	reg = readl_relaxed(tst_addr);
-	pr_err("CTRL SEL CFG0 testbus %08x\n", reg);
+	pr_info_ratelimited("%s:  CTRL SEL CFG0 testbus %08x\n",
+					__func__, reg);
 
 	/*   CTRL SEL CFG1 */
 	reg = 0;
@@ -723,7 +743,7 @@ void wcnss_pronto_log_debug_regs(void)
 		WCNSS_TSTBUS_CTRL_CTRL_CFG1;
 	writel_relaxed(reg, tst_ctrl_addr);
 	reg = readl_relaxed(tst_addr);
-	pr_err("CTRL SEL CFG1 testbus %08x\n", reg);
+	pr_info_ratelimited("%s:  CTRL SEL CFG1 testbus %08x\n", __func__, reg);
 
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_WLAN_BCR_OFFSET;
@@ -734,27 +754,23 @@ void wcnss_pronto_log_debug_regs(void)
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_WLAN_AHB_CBCR_OFFSET;
 	reg3 = readl_relaxed(reg_addr);
-	pr_err("PMU_WLAN_AHB_CBCR %08x\n", reg3);
+	pr_info_ratelimited("%s:  PMU_WLAN_AHB_CBCR %08x\n", __func__, reg3);
 
 	if ((reg & PRONTO_PMU_WLAN_BCR_BLK_ARES) ||
 		(reg2 & PRONTO_PMU_WLAN_GDSCR_SW_COLLAPSE) ||
 		(!(reg4 & PRONTO_PMU_CPU_AHB_CMD_RCGR_ROOT_EN)) ||
 		(reg3 & PRONTO_PMU_WLAN_AHB_CBCR_CLK_OFF) ||
 		(!(reg3 & PRONTO_PMU_WLAN_AHB_CBCR_CLK_EN))) {
-		pr_err("Cannot log, wlan domain is power collapsed\n");
-		
+		pr_info_ratelimited("%s:  Cannot log, wlan domain is power collapsed\n",
+				__func__);
 		return;
 	}
 
 	msleep(50);
-	
-	reg = readl_relaxed(penv->wlan_tx_phy_aborts);
-	pr_err("WLAN_TX_PHY_ABORTS %08x\n", reg);
-	
-	reg_addr = penv->pronto_mcu_base + MCU_APB2PHY_STATUS_OFFSET;
-	reg = readl_relaxed(reg_addr);
 
-	
+	reg = readl_relaxed(penv->wlan_tx_phy_aborts);
+	pr_info_ratelimited("%s: WLAN_TX_PHY_ABORTS %08x\n", __func__, reg);
+
 	reg_addr = penv->pronto_mcu_base + MCU_CBR_CCAHB_ERR_OFFSET;
 	reg = readl_relaxed(reg_addr);
 	pr_err("MCU_CBR_CCAHB_ERR %08x\n", reg);
@@ -804,20 +820,20 @@ void wcnss_pronto_log_debug_regs(void)
 	pr_err("MCU_FDBR_FDAHB_TIMEOUT %08x\n", reg);
 
 	reg = readl_relaxed(penv->wlan_brdg_err_source);
-	pr_err("WLAN_BRDG_ERR_SOURCE %08x\n", reg);
+	pr_info_ratelimited("%s: WLAN_BRDG_ERR_SOURCE %08x\n", __func__, reg);
 
 	reg = readl_relaxed(penv->wlan_tx_status);
-	pr_err("WLAN_TXP_STATUS %08x\n", reg);
-	
+	pr_info_ratelimited("%s: WLAN_TX_STATUS %08x\n", __func__, reg);
+
 	reg = readl_relaxed(penv->alarms_txctl);
 	pr_err("ALARMS_TXCTL %08x\n", reg);
-	
+
 	reg = readl_relaxed(penv->alarms_tactl);
 	pr_err("ALARMS_TACTL %08x\n", reg);
 }
 EXPORT_SYMBOL(wcnss_pronto_log_debug_regs);
 
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
+#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
 static void wcnss_log_iris_regs(void)
 {
 	int i;
@@ -833,9 +849,7 @@ static void wcnss_log_iris_regs(void)
 		pr_info("[0x%08x] : 0x%08x\n", regs_array[i], reg_val);
 	}
 }
-#endif
 
-#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
 void wcnss_log_debug_regs_on_bite(void)
 {
 	struct platform_device *pdev = wcnss_get_platform_device();
@@ -850,18 +864,18 @@ void wcnss_log_debug_regs_on_bite(void)
 	wcnss_debug_mux = clk_get(&pdev->dev, "wcnss_debug");
 
 	if (!IS_ERR(measure) && !IS_ERR(wcnss_debug_mux)) {
-		clk_set_parent(measure, wcnss_debug_mux);
+		if (clk_set_parent(measure, wcnss_debug_mux))
+			return;
+
 		clk_rate = clk_get_rate(measure);
 		pr_debug("wcnss: clock frequency is: %luHz\n", clk_rate);
 
-		if (clk_rate){
+		if (clk_rate) {
 			wcnss_pronto_log_debug_regs();
 		} else {
 			pr_err("clock frequency is zero, cannot access PMU or other registers\n");
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-                        wcnss_log_iris_regs();
-#endif
-                }
+			wcnss_log_iris_regs();
+		}
 	}
 }
 #endif
@@ -947,15 +961,14 @@ static void wcnss_smd_notify_event(void *data, unsigned int event)
 		pr_debug("wcnss: opening WCNSS SMD channel :%s",
 				WCNSS_CTRL_CHANNEL);
 		schedule_work(&penv->wcnssctrl_version_work);
-
+		schedule_work(&penv->wcnss_pm_config_work);
 		break;
 
 	case SMD_EVENT_CLOSE:
 		pr_debug("wcnss: closing WCNSS SMD channel :%s",
 				WCNSS_CTRL_CHANNEL);
-		/* This SMD is closed only during SSR */
-		penv->ssr_boot = true;
 		penv->nv_downloaded = 0;
+		penv->is_cbc_done = 0;
 		break;
 
 	default:
@@ -1124,6 +1137,12 @@ struct device *wcnss_wlan_get_device(void)
 }
 EXPORT_SYMBOL(wcnss_wlan_get_device);
 
+void wcnss_get_monotonic_boottime(struct timespec *ts)
+{
+	get_monotonic_boottime(ts);
+}
+EXPORT_SYMBOL(wcnss_get_monotonic_boottime);
+
 struct platform_device *wcnss_get_platform_device(void)
 {
 	if (penv && penv->pdev)
@@ -1143,11 +1162,20 @@ EXPORT_SYMBOL(wcnss_get_wlan_config);
 int wcnss_device_ready(void)
 {
 	if (penv && penv->pdev && penv->nv_downloaded &&
-		!wcnss_device_is_shutdown() )
+	    !wcnss_device_is_shutdown())
 		return 1;
 	return 0;
 }
 EXPORT_SYMBOL(wcnss_device_ready);
+
+bool wcnss_cbc_complete(void)
+{
+	if (penv && penv->pdev && penv->is_cbc_done &&
+		!wcnss_device_is_shutdown())
+		return true;
+	return false;
+}
+EXPORT_SYMBOL(wcnss_cbc_complete);
 
 int wcnss_device_is_shutdown(void)
 {
@@ -1232,7 +1260,6 @@ EXPORT_SYMBOL(wcnss_get_serial_number);
 
 int wcnss_get_wlan_mac_address(char mac_addr[WLAN_MAC_ADDR_SIZE])
 {
-      return -1;
 	if (!penv)
 		return -ENODEV;
 
@@ -1410,6 +1437,14 @@ int wcnss_get_wlan_unsafe_channel(u16 *unsafe_ch_list, u16 buffer_size,
 		return -ENODEV;
 }
 EXPORT_SYMBOL(wcnss_get_wlan_unsafe_channel);
+
+const char *wcnss_get_nv_file_name(void)
+{
+	if (penv && penv->nv_file_name && strlen(penv->nv_file_name) > 0)
+		return penv->nv_file_name;
+	return NULL;
+}
+EXPORT_SYMBOL(wcnss_get_nv_file_name);
 
 static int wcnss_smd_tx(void *data, int len)
 {
@@ -1771,6 +1806,8 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 		fw_status = wcnss_fw_status();
 		pr_debug("wcnss: received WCNSS_NVBIN_DNLD_RSP from ccpu %u\n",
 			fw_status);
+		if (fw_status != WAIT_FOR_CBC_IND)
+			penv->is_cbc_done = 1;
 		wcnss_setup_vbat_monitoring();
 		break;
 
@@ -1780,9 +1817,12 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 		pr_debug("wcnss: received WCNSS_CALDATA_DNLD_RSP from ccpu %u\n",
 			fw_status);
 		break;
+	case WCNSS_CBC_COMPLETE_IND:
+		penv->is_cbc_done = 1;
+		pr_debug("wcnss: received WCNSS_CBC_COMPLETE_IND from FW\n");
+		break;
 
 	case WCNSS_CALDATA_UPLD_REQ:
-		penv->fw_cal_available = 0;
 		extract_cal_data(len);
 		break;
 
@@ -1821,16 +1861,17 @@ static void wcnss_nvbin_dnld(void)
 	unsigned int nv_blob_size = 0;
 	const struct firmware *nv = NULL;
 	struct device *dev = &penv->pdev->dev;
+	const char *nv_file_name = (penv->nv_file_name ?
+					penv->nv_file_name : NVBIN_FILE);
 
-  pr_err("wcnss: wcnss_nvbin_dnld \n");
 	down_read(&wcnss_pm_sem);
-  pr_err("wcnss: request_firmware \n");
 
-	ret = request_firmware(&nv, NVBIN_FILE, dev);
+	pr_info("wcnss: NV file name = %s\n", nv_file_name);
+	ret = request_firmware(&nv, nv_file_name, dev);
 
 	if (ret || !nv || !nv->data || !nv->size) {
 		pr_err("wcnss: %s: request_firmware failed for %s\n",
-			__func__, NVBIN_FILE);
+			__func__, nv_file_name);
 		goto out;
 	}
 
@@ -1843,8 +1884,8 @@ static void wcnss_nvbin_dnld(void)
 
 	total_fragments = TOTALFRAGMENTS(nv_blob_size);
 
-  pr_err("wcnss: NV bin size: %d, total_fragments: %d\n",
-  nv_blob_size, total_fragments);
+	pr_info("wcnss: NV bin size: %d, total_fragments: %d\n",
+		nv_blob_size, total_fragments);
 
 	/* get buffer for nv bin dnld req message */
 	outbuffer = kmalloc((sizeof(struct nvbin_dnld_req_msg) +
@@ -2051,6 +2092,46 @@ nv_download:
 	return;
 }
 
+static void wcnss_send_pm_config(struct work_struct *worker)
+{
+	struct smd_msg_hdr *hdr;
+	unsigned char *msg = NULL;
+	int rc, prop_len;
+	u32 *payload;
+
+	if (!of_find_property(penv->pdev->dev.of_node,
+				"qcom,cnss-pm", &prop_len))
+		return ;
+
+	msg = kmalloc((sizeof(struct smd_msg_hdr) + prop_len), GFP_KERNEL);
+	if (NULL == msg) {
+		pr_err("wcnss: %s: failed to get memory\n", __func__);
+		return;
+	}
+
+	payload = (u32 *)(msg+sizeof(struct smd_msg_hdr));
+	rc = of_property_read_u32_array(penv->pdev->dev.of_node,
+		"qcom,cnss-pm", payload, prop_len >> 2);
+
+	if (rc < 0)
+		pr_err("wcnss: property read failed\n");
+
+	pr_info("wcnss_send_pm_config, size=%d, <%d, %d, %d, %d, %d>\n",
+		prop_len, *payload, *(payload + 1), *(payload + 2),
+		*(payload + 3), *(payload + 4));
+
+	hdr = (struct smd_msg_hdr *)msg;
+	hdr->msg_type = WCNSS_PM_CONFIG_REQ;
+	hdr->msg_len = sizeof(struct smd_msg_hdr) + prop_len;
+
+	rc = wcnss_smd_tx(msg, hdr->msg_len);
+	if (rc < 0)
+		pr_err("wcnss: smd tx failed\n");
+
+	kfree(msg);
+}
+
+
 static int wcnss_pm_notify(struct notifier_block *b,
 			unsigned long event, void *p)
 {
@@ -2167,6 +2248,8 @@ wcnss_trigger_config(struct platform_device *pdev)
 		return 0;
 	penv->triggered = 1;
 
+	penv->nv_file_name = of_get_property(pdev->dev.of_node,
+						"qcom,nv_file", NULL);
 	/* initialize the WCNSS device configuration */
 	pdata = pdev->dev.platform_data;
 	if (WCNSS_CONFIG_UNSPECIFIED == has_48mhz_xo) {
@@ -2233,6 +2316,7 @@ wcnss_trigger_config(struct platform_device *pdev)
 	INIT_WORK(&penv->wcnssctrl_rx_work, wcnssctrl_rx_handler);
 	INIT_WORK(&penv->wcnssctrl_version_work, wcnss_send_version_req);
 	INIT_WORK(&penv->wcnssctrl_nvbin_dnld_work, wcnss_nvbin_dnld_main);
+	INIT_WORK(&penv->wcnss_pm_config_work, wcnss_send_pm_config);
 
 	wake_lock_init(&penv->wcnss_wake_lock, WAKE_LOCK_SUSPEND, "wcnss");
 
@@ -2352,18 +2436,21 @@ wcnss_trigger_config(struct platform_device *pdev)
 		penv->fw_vbatt_state = WCNSS_CONFIG_UNSPECIFIED;
 	}
 
-	
 	do {
-	/* trigger initialization of the WCNSS */
-	penv->pil = subsystem_get(WCNSS_PIL_DEVICE);
-	if (IS_ERR(penv->pil)) {
-		dev_err(&pdev->dev, "Peripheral Loader failed on WCNSS.\n");
-		ret = PTR_ERR(penv->pil);
-		wcnss_pronto_log_debug_regs();
+		/* trigger initialization of the WCNSS */
+		penv->pil = subsystem_get(WCNSS_PIL_DEVICE);
+		if (IS_ERR(penv->pil)) {
+			dev_err(&pdev->dev, "Peripheral Loader failed on WCNSS.\n");
+			ret = PTR_ERR(penv->pil);
+			wcnss_pronto_log_debug_regs();
 		}
 	} while (pil_retry++ < WCNSS_MAX_PIL_RETRY && IS_ERR(penv->pil));
-	
+
 	if (pil_retry >= WCNSS_MAX_PIL_RETRY) {
+		wcnss_reset_intr();
+		if (penv->wcnss_notif_hdle)
+			subsys_notif_unregister_notifier(penv->wcnss_notif_hdle,
+				&wnb);
 		penv->pil = NULL;
 		goto fail_pil;
 	}
@@ -2381,7 +2468,7 @@ fail_ioremap12:
 fail_ioremap11:
 	if (penv->alarms_txctl)
 		iounmap(penv->alarms_txctl);
-fail_ioremap10:		
+fail_ioremap10:
 	if (penv->wlan_tx_status)
 		iounmap(penv->wlan_tx_status);
 fail_ioremap9:
@@ -2542,23 +2629,20 @@ exit:
 }
 
 
-static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,void *ss_handle)
+static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,
+				void *ss_handle)
 {
-        pr_debug("%s: wcnss notification event: %lu\n", __func__, code);
+	pr_debug("%s: wcnss notification event: %lu\n", __func__, code);
 
-        if (SUBSYS_POWERUP_FAILURE == code)
-                wcnss_pronto_log_debug_regs();
-		else if(SUBSYS_BEFORE_SHUTDOWN == code)
-				penv->is_shutdown = 1;
-		else if(SUBSYS_AFTER_POWERUP == code)
-				penv->is_shutdown = 0;
+	if (SUBSYS_POWERUP_FAILURE == code)
+		wcnss_pronto_log_debug_regs();
+	else if (SUBSYS_BEFORE_SHUTDOWN == code)
+		penv->is_shutdown = 1;
+	else if (SUBSYS_AFTER_POWERUP == code)
+		penv->is_shutdown = 0;
 
-        return NOTIFY_DONE;
-}	
-
-static struct notifier_block wnb = {
-        .notifier_call = wcnss_notif_cb,
-};
+	return NOTIFY_DONE;
+}
 
 static const struct file_operations wcnss_node_fops = {
 	.owner = THIS_MODULE,
@@ -2599,17 +2683,20 @@ wcnss_wlan_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
-        /* register wcnss event notification */
-        penv->wcnss_notif_hdle = subsys_notif_register_notifier("wcnss", &wnb);
-        if (IS_ERR(penv->wcnss_notif_hdle)) {
-                pr_err("wcnss: register event notification failed!\n");
-                return PTR_ERR(penv->wcnss_notif_hdle);
-        }
+	/* register wcnss event notification */
+	penv->wcnss_notif_hdle = subsys_notif_register_notifier("wcnss", &wnb);
+	if (IS_ERR(penv->wcnss_notif_hdle)) {
+		pr_err("wcnss: register event notification failed!\n");
+		return PTR_ERR(penv->wcnss_notif_hdle);
+	}
 
 	mutex_init(&penv->dev_lock);
 	mutex_init(&penv->ctrl_lock);
 	mutex_init(&penv->vbat_monitor_mutex);
 	init_waitqueue_head(&penv->read_wait);
+
+	/* populate serial_number during init */
+	penv->serial_number = system_serial_low;
 
 	/* Since we were built into the kernel we'll be called as part
 	 * of kernel initialization.  We don't know if userspace
@@ -2630,8 +2717,8 @@ wcnss_wlan_probe(struct platform_device *pdev)
 static int __devexit
 wcnss_wlan_remove(struct platform_device *pdev)
 {
-        if (penv->wcnss_notif_hdle)
-                subsys_notif_unregister_notifier(penv->wcnss_notif_hdle, &wnb);
+	if (penv->wcnss_notif_hdle)
+		subsys_notif_unregister_notifier(penv->wcnss_notif_hdle, &wnb);
 	wcnss_remove_sysfs(&pdev->dev);
 	penv = NULL;
 	return 0;
@@ -2665,19 +2752,12 @@ static struct platform_driver wcnss_wlan_driver = {
 
 static int __init wcnss_wlan_init(void)
 {
-	int ret = 0;
-
 	platform_driver_register(&wcnss_wlan_driver);
 	platform_driver_register(&wcnss_wlan_ctrl_driver);
 	platform_driver_register(&wcnss_ctrl_driver);
 	register_pm_notifier(&wcnss_pm_notifier);
-#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
-	ret = wcnss_prealloc_init();
-	if (ret < 0)
-		pr_err("wcnss: pre-allocation failed\n");
-#endif
 
-	return ret;
+	return 0;
 }
 
 static void __exit wcnss_wlan_exit(void)
@@ -2688,9 +2768,6 @@ static void __exit wcnss_wlan_exit(void)
 		penv = NULL;
 	}
 
-#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
-	wcnss_prealloc_deinit();
-#endif
 	unregister_pm_notifier(&wcnss_pm_notifier);
 	platform_driver_unregister(&wcnss_ctrl_driver);
 	platform_driver_unregister(&wcnss_wlan_ctrl_driver);
