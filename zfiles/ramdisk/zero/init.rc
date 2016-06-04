@@ -12,6 +12,7 @@ import /init.usb.rc
 import /init.${ro.hardware}.rc
 import /init.trace.rc
 import /init.carrier.rc
+import /init.zero_env.rc
 
 on early-init
     # Set init and its forked children's oom_adj.
@@ -1295,15 +1296,6 @@ service createsystemfile /system/bin/createsystemfile
     group system
     disabled
     oneshot
-
-# CPU input boost driver (ZERO KERNEL)
-    chmod 0777 /sys/kernel/cpu_input_boost/enabled
-    chmod 0777 /sys/kernel/cpu_input_boost/ib_freqs
-    chmod 0777 /sys/kernel/cpu_input_boost/ib_duration_ms
-
-    write /sys/kernel/cpu_input_boost/enabled 1
-    write /sys/kernel/cpu_input_boost/ib_freqs 1497600 1593600
-    write /sys/kernel/cpu_input_boost/ib_duration_ms 1400
 
 on property:sys.boot_completed=1
     write /sys/block/mmcblk0/queue/scheduler cfq
