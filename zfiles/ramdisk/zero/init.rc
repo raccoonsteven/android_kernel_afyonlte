@@ -1297,15 +1297,12 @@ service createsystemfile /system/bin/createsystemfile
     oneshot
 
 # CPU input boost driver (ZERO KERNEL)
-    chown system system /sys/kernel/cpu_input_boost/enabled
-    chmod 0750 /sys/kernel/cpu_input_boost/enabled
-    chown system system /sys/kernel/cpu_input_boost/ib_freqs
-    chmod 0750 /sys/kernel/cpu_input_boost/ib_freqs
-    chown system system /sys/kernel/cpu_input_boost/ib_duration_ms
-    chmod 0750 /sys/kernel/cpu_input_boost/ib_duration_ms
+    chmod 0777 /sys/kernel/cpu_input_boost/enabled
+    chmod 0777 /sys/kernel/cpu_input_boost/ib_freqs
+    chmod 0777 /sys/kernel/cpu_input_boost/ib_duration_ms
 
     write /sys/kernel/cpu_input_boost/enabled 1
-    write /sys/kernel/cpu_input_boost/ib_freqs 1094400 1190400
+    write /sys/kernel/cpu_input_boost/ib_freqs 1497600 1593600
     write /sys/kernel/cpu_input_boost/ib_duration_ms 1400
 
 on property:sys.boot_completed=1
