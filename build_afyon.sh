@@ -20,6 +20,7 @@ echo -e "${bldred}
 ${txtrst}"
 
 rm -rf ./$version-DM47021.zip
+rm -rf zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
 
 make mrproper
 
@@ -65,6 +66,7 @@ ${txtrst}"
 
 find -name '*.ko' -exec cp -av {} zfiles/packaging/system/lib/modules/ \;
 cp zfiles/packaging/system/lib/modules/pronto_wlan.ko zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
+rm -rf zfiles/packaging/system/lib/modules/pronto_wlan.ko
 
 # Build dt.img
 echo""
