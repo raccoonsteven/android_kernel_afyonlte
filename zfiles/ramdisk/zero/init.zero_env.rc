@@ -1,0 +1,25 @@
+# set up the zero kernel environment
+
+on post-fs-data
+
+    # Run sysinit (init.d)
+    start sysinit
+
+on boot
+# allow system to modify cpu_input_boost via sysfs
+    chown root system /sys/kernel/cpu_input_boost/enabled
+    chmod 0750 /sys/kernel/cpu_input_boost/enabled
+    chown root system /sys/kernel/cpu_input_boost/ib_freqs
+    chmod 0750 /sys/kernel/cpu_input_boost/ib_freqs
+    chown root system /sys/kernel/cpu_input_boost/ib_duration_ms
+    chmod 0750 /sys/kernel/cpu_input_boost/ib_duration_ms
+
+# sysinit (/system/etc/init.d)
+service sysinit /system/bin/sysinit
+    user root
+    oneshot
+    disabled
+
+setprop ro.securestorage.support=false
+
+
