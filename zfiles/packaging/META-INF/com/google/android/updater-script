@@ -15,6 +15,7 @@ ui_print("");
 ui_print("Setting Permissions");
 set_metadata("/system/bin/sysinit", "uid", 0, "gid", 2000, "mode", 0755, "capabilities", 0x0, "selabel", "u:object_r:sysinit_exec:s0");
 set_metadata_recursive("/system/etc/init.d", "uid", 0, "gid", 2000, "dmode", 0755, "fmode", 0755, "capabilities", "0x0", "selabel", "u:object_r:system_file:s0");
+set_metadata("/system/etc/init.d/00zero", "uid", 0, "gid", 2000, "mode", 0755, "capabilities", 0x0, "selabel", "u:object_r:userinit_exec:s0");
 set_metadata("/system/etc/init.d/60Inputboost", "uid", 0, "gid", 2000, "mode", 0755, "capabilities", 0x0, "selabel", "u:object_r:userinit_exec:s0");
 show_progress(0.100000, 0);
 unmount("/system");

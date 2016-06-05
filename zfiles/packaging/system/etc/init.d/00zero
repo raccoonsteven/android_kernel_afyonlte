@@ -1,0 +1,12 @@
+#!/system/bin/sh
+#
+# Print startup info
+#
+L="log -p i -t zero"
+
+$L "ZZZZZZZZZ EEEEEEEE  RRRRRRRR 00000000";
+$L "     ZZ   EE        RR    RR 00    00";
+$L "   ZZ     EEEEE     RRRRRRR  0      0";
+$L " ZZ       EE        RR   RR  00    00";
+$L "ZZZZZZZZZ EEEEEEEE  RR    RR 00000000";
+$L "Welcome to ZER0 `getprop ro.zkernel.version`";

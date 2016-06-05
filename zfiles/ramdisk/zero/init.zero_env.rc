@@ -21,5 +21,6 @@ service sysinit /system/bin/sysinit
     disabled
 
 setprop ro.securestorage.support=false
+setprop ro.zkernel.version=ZERO_KERNEL-0.3d
 
 

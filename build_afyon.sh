@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-export version=ZERO_KERNEL-0.2d-ANK3
+export version=ZERO_KERNEL-0.3d-ANK3
 export CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
 
 # Colorize and add text parameters
