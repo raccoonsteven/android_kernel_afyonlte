@@ -23,7 +23,7 @@ ${txtrst}"
 rm -rf ./$version-DM47021.zip
 rm -rf zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
 
-#make mrproper
+make mrproper
 
 loc=~/.gnome2/nautilus-scripts/SignScripts/
 date=$(date +%Y%m%d-%H:%M:%S)
