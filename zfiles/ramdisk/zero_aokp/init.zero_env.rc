@@ -1,0 +1,14 @@
+# set up the zero kernel environment aokp
+
+on boot
+# allow system to modify cpu_input_boost via sysfs
+    chown root system /sys/kernel/cpu_input_boost/enabled
+    chmod 0750 /sys/kernel/cpu_input_boost/enabled
+    chown root system /sys/kernel/cpu_input_boost/ib_freqs
+    chmod 0750 /sys/kernel/cpu_input_boost/ib_freqs
+    chown root system /sys/kernel/cpu_input_boost/ib_duration_ms
+    chmod 0750 /sys/kernel/cpu_input_boost/ib_duration_ms
+
+setprop ro.zkernel.version=ZERO_KERNEL-0.3d-AOKP
+
+

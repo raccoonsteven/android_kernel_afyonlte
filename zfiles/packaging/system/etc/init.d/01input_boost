@@ -1,5 +1,6 @@
 #!/system/bin/sh
-
 echo 1 > /sys/kernel/cpu_input_boost/enabled;
 echo 1400 > /sys/kernel/cpu_input_boost/ib_duration_ms;
 echo "1497600 1593600" > /sys/kernel/cpu_input_boost/ib_freqs;
+
+
