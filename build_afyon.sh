@@ -1,6 +1,7 @@
 #!/bin/bash 
 
 export version=ZERO_KERNEL-0.2d-ANK3
+export CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
 
 # Colorize and add text parameters
 red=$(tput setaf 1) # red
@@ -52,8 +53,7 @@ echo -e "${bldblu}
 ${txtrst}" 
 cp zero_afyonlte_defconfig .config
 
-make -j64 ARCH=arm CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
-make -j64 ARCH=arm CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
+make -j64 ARCH=arm
 
 echo -e "${bldgrn} 
       Kernel Built Sucessfully!!
@@ -64,6 +64,7 @@ echo -e "${bldgrn}
 ${txtrst}"
 
 find -name '*.ko' -exec cp -av {} zfiles/packaging/system/lib/modules/ \;
+cp zfiles/packaging/system/lib/modules/pronto_wlan.ko zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
 
 # Build dt.img
 echo""
