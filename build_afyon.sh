@@ -1,7 +1,8 @@
 #!/bin/bash 
 
-export version=ZERO_KERNEL-0.3d-ANK3
-export CROSS_COMPILE=/home/dm47021/Android/toolchains/arm-eabi-4.7/bin/arm-eabi-
+export version=ZERO_KERNEL-0.4d-linaro
+
+export TOOLCHAIN=/home/dm47021/Android/toolchains/linaro-4.9.4-cortex-a7/bin/arm-cortex_a7-linux-gnueabihf-
 
 # Colorize and add text parameters
 red=$(tput setaf 1) # red
@@ -22,7 +23,7 @@ ${txtrst}"
 rm -rf ./$version-DM47021.zip
 rm -rf zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
 
-make mrproper
+#make mrproper
 
 loc=~/.gnome2/nautilus-scripts/SignScripts/
 date=$(date +%Y%m%d-%H:%M:%S)
@@ -54,7 +55,7 @@ echo -e "${bldblu}
 ${txtrst}" 
 cp zero_afyonlte_defconfig .config
 
-make -j64 ARCH=arm
+make -j64 ARCH=arm CROSS_COMPILE=$TOOLCHAIN
 
 echo -e "${bldgrn} 
       Kernel Built Sucessfully!!
