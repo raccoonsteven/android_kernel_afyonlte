@@ -17,5 +17,4 @@ $(src)/aesbs-core.S_shipped: $(src)/bsaes-armv7.pl
 	$(call cmd,perl)
 
 .PRECIOUS: $(obj)/aesbs-core.S
-Status API Training Shop Blog About
 
