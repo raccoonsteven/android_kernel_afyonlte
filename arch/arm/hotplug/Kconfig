@@ -1,5 +1,27 @@
+menu "Zero Kernel Hotplug implementations"
+
+config ALTERNATE_MSM_HOTPLUGS
+        bool "Enable Other Hotplug drivers"
+        default n
+        help
+          Generic cpu hotplug drivers for ARM SOCs
+
+if ALTERNATE_MSM_HOTPLUGS
+
 config INTELLI_PLUG
         bool "Enable intelli-plug cpu hotplug driver"
         default n
         help
           Generic Intelli-plug cpu hotplug driver for ARM SOCs
+
+config BRICKED_HOTPLUG
+	bool "Enable kernel based mpdecision"
+	depends on MSM_RUN_QUEUE_STATS
+	default n
+	help
+	 This enables kernel based multi core control.
+	 (up/down hotplug based on load) 
+
+
+endif
+endmenu 
