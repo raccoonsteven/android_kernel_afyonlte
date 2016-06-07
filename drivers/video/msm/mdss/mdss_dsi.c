@@ -21,6 +21,9 @@
 #include <linux/gpio.h>
 #include <linux/err.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_STATE_NOTIFIER
+#include <linux/state_notifier.h>
+#endif
 #include <linux/lcd_notify.h>
 #include <linux/clk.h>
 
@@ -1139,6 +1142,10 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		ctrl_pdata->mdp_tg_on = 1;
 		if (ctrl_pdata->dsi_on_state == DSI_HS_MODE)
 			rc = mdss_dsi_unblank(pdata);
+#ifdef CONFIG_STATE_NOTIFIER
+		if (!use_fb_notifier)
+			state_notifier_call_chain(STATE_NOTIFIER_ACTIVE, NULL);
+#endif
 		lcd_notifier_call_chain(LCD_EVENT_ON_END, NULL);
 		break;
 	case MDSS_EVENT_BLANK:
@@ -1153,6 +1160,10 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 			rc = mdss_dsi_blank(pdata);
 		rc = mdss_dsi_off(pdata);
                 lcd_notifier_call_chain(LCD_EVENT_OFF_END, NULL);
+#ifdef CONFIG_STATE_NOTIFIER
+		if (!use_fb_notifier)
+			state_notifier_call_chain(STATE_NOTIFIER_SUSPEND, NULL);
+#endif
 		break;
 #if defined(CONFIG_FB_MSM_MDSS_S6E8AA0A_HD_PANEL)
 	case MTP_READ:

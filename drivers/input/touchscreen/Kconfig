@@ -1144,4 +1144,9 @@ source "drivers/input/touchscreen/wacom_hl/Kconfig"
 source "drivers/input/touchscreen/melfas_mms136/Kconfig"
 source "drivers/input/touchscreen/stm_fts/Kconfig"
 source "drivers/input/touchscreen/stm_s/Kconfig"
+
+config STATE_NOTIFIER
+        bool "State Notifier"
+	default y
+
 endif
