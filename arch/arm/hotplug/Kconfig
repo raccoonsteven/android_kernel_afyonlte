@@ -8,11 +8,13 @@ config ALTERNATE_MSM_HOTPLUGS
 
 if ALTERNATE_MSM_HOTPLUGS
 
-config INTELLI_PLUG
-        bool "Enable intelli-plug cpu hotplug driver"
-        default n
-        help
-          Generic Intelli-plug cpu hotplug driver for ARM SOCs
+config ASMP
+	bool "Multi-core automatic hotplug support"
+	depends on SMP
+	default n
+	help
+	  Automatically hotplugs the multiple cpu cores on and off
+	  based on cpu load and suspend state
 
 config BRICKED_HOTPLUG
 	bool "Enable kernel based mpdecision"
@@ -21,6 +23,18 @@ config BRICKED_HOTPLUG
 	help
 	 This enables kernel based multi core control.
 	 (up/down hotplug based on load) 
+
+config INTELLI_PLUG
+        bool "Enable intelli-plug cpu hotplug driver"
+        default n
+        help
+          Generic Intelli-plug cpu hotplug driver for ARM SOCs
+
+config MSM_SLEEPER
+ 	bool "CPU hotplug driver"
+ 	default n
+ 	help
+ 	  CPU hotplug driver 
 
 config ZEN_DECISION
 	bool "Zen Decision: MSM Userspace Handler"
