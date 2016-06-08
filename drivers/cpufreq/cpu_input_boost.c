@@ -269,7 +269,7 @@ static struct kobject *cpu_iboost_kobject;
 static ssize_t boost_freqs_write(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
-	unsigned int freq[3], i = 0;
+	unsigned int freq[3];
 	int ret = sscanf(buf, "%u %u %u", &freq[0], &freq[1], &freq[2]);
 
 	if (ret != 3)
@@ -278,23 +278,12 @@ static ssize_t boost_freqs_write(struct device *dev,
 	if (!freq[0] || !freq[1] || !freq[2])
 		return -EINVAL;
 
-	/* Freq order should be [high, mid, low], so always order it like that */
-	boost_freq[0] = max3(freq[0], freq[1], freq[2]);
-	boost_freq[2] = min3(freq[0], freq[1], freq[2]);
-
-	/* Use the same freq for CPU2 and CPU3 */
-	boost_freq[3] = boost_freq[2];
-
-	while (++i) {
-		if ((freq[i] == boost_freq[0]) ||
-			(freq[i] == boost_freq[2])) {
-			freq[i] = 0;
-			i = 0;
-		} else if (freq[i]) {
-			boost_freq[1] = freq[i];
-			break;
-		}
-	}
+	/* ib_freq[0] is assigned to CPU0, ib_freq[1] to CPU1, and so on */
+	boost_freq[0] = freq[0];
+	boost_freq[1] = freq[1];
+	boost_freq[2] = freq[2];
+	/* Use same freq for CPU2 & CPU3 (as only 3 cores may be boosted at once) */
+	boost_freq[3] = freq[2];
 
 	freqs_available = true;
 
