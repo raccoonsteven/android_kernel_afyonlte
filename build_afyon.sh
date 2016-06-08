@@ -55,7 +55,7 @@ echo -e "${bldblu}
 ${txtrst}" 
 cp zero_afyonlte_defconfig .config
 
-make -j4 ARCH=arm CROSS_COMPILE=$TOOLCHAIN
+make -j64 ARCH=arm CROSS_COMPILE=$TOOLCHAIN
 
 echo -e "${bldgrn} 
       Kernel Built Sucessfully!!
