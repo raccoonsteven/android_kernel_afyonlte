@@ -23,16 +23,13 @@
 #include <linux/rcupdate.h>
 #include <linux/ftrace.h>
 #include <linux/smp.h>
+#include <linux/smpboot.h>
 #include <linux/tick.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
 
 #include <asm/irq.h>
-#ifdef CONFIG_SEC_DEBUG
-#include <mach/sec_debug.h>
-#endif
-
 /*
    - No shared variables, all the data are CPU local.
    - If a softirq needs serialization, let it serialize itself
@@ -41,7 +38,6 @@
      execution. Hence, we get something sort of weak cpu binding.
      Though it is still not clear, will it result in better locality
      or will not.
-
    Examples:
    - NET RX softirq. It is multithreaded and does not require
      any global serialization.
@@ -239,13 +235,7 @@ restart:
 			kstat_incr_softirqs_this_cpu(vec_nr);
 
 			trace_softirq_entry(vec_nr);
-#ifdef CONFIG_SEC_DEBUG
-			secdbg_msg("softirq %pS entry", h->action);
-#endif
 			h->action(h);
-#ifdef CONFIG_SEC_DEBUG
-			secdbg_msg("softirq %pS exit", h->action);
-#endif
 			trace_softirq_exit(vec_nr);
 			if (unlikely(prev_count != preempt_count())) {
 				printk(KERN_ERR "huh, entered softirq %u %s %p"
@@ -343,10 +333,6 @@ void irq_exit(void)
 {
 	account_system_vtime(current);
 	trace_hardirq_exit();
-#ifdef CONFIG_SEC_DEBUG
-	secdbg_msg("hardirq exit");
-#endif
-
 	sub_preempt_count(IRQ_EXIT_OFFSET);
 	if (!in_interrupt() && local_softirq_pending())
 		invoke_softirq();
@@ -470,13 +456,7 @@ static void tasklet_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
-#ifdef CONFIG_SEC_DEBUG
-				sec_debug_irq_sched_log(-1, t->func, 3);
 				t->func(t->data);
-				sec_debug_irq_sched_log(-1, t->func, 4);
-#else
-				t->func(t->data);
-#endif
 				tasklet_unlock(t);
 				continue;
 			}
@@ -753,49 +733,22 @@ void __init softirq_init(void)
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action);
 }
 
-static int run_ksoftirqd(void * __bind_cpu)
+static int ksoftirqd_should_run(unsigned int cpu)
 {
-	set_current_state(TASK_INTERRUPTIBLE);
+	return local_softirq_pending();
+}
 
-	while (!kthread_should_stop()) {
-		preempt_disable();
-		if (!local_softirq_pending()) {
-			schedule_preempt_disabled();
-		}
-
-		__set_current_state(TASK_RUNNING);
-
-		while (local_softirq_pending()) {
-			/* Preempt disable stops cpu going offline.
-			   If already offline, we'll be on wrong CPU:
-			   don't process */
-			if (cpu_is_offline((long)__bind_cpu))
-				goto wait_to_die;
-			local_irq_disable();
-			if (local_softirq_pending())
-				__do_softirq();
-			local_irq_enable();
-			sched_preempt_enable_no_resched();
-			cond_resched();
-			preempt_disable();
-			rcu_note_context_switch((long)__bind_cpu);
-		}
-		preempt_enable();
-		set_current_state(TASK_INTERRUPTIBLE);
+static void run_ksoftirqd(unsigned int cpu)
+{
+	local_irq_disable();
+	if (local_softirq_pending()) {
+		__do_softirq();
+		rcu_note_context_switch(cpu);
+		local_irq_enable();
+		cond_resched();
+		return;
 	}
-	__set_current_state(TASK_RUNNING);
-	return 0;
-
-wait_to_die:
-	preempt_enable();
-	/* Wait for kthread_stop */
-	set_current_state(TASK_INTERRUPTIBLE);
-	while (!kthread_should_stop()) {
-		schedule();
-		set_current_state(TASK_INTERRUPTIBLE);
-	}
-	__set_current_state(TASK_RUNNING);
-	return 0;
+	local_irq_enable();
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -861,50 +814,14 @@ static int __cpuinit cpu_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
 {
-	int hotcpu = (unsigned long)hcpu;
-	struct task_struct *p;
-
 	switch (action) {
-	case CPU_UP_PREPARE:
-	case CPU_UP_PREPARE_FROZEN:
-		p = kthread_create_on_node(run_ksoftirqd,
-					   hcpu,
-					   cpu_to_node(hotcpu),
-					   "ksoftirqd/%d", hotcpu);
-		if (IS_ERR(p)) {
-			printk("ksoftirqd for %i failed\n", hotcpu);
-			return notifier_from_errno(PTR_ERR(p));
-		}
-		kthread_bind(p, hotcpu);
-  		per_cpu(ksoftirqd, hotcpu) = p;
- 		break;
-	case CPU_ONLINE:
-	case CPU_ONLINE_FROZEN:
-		wake_up_process(per_cpu(ksoftirqd, hotcpu));
-		break;
 #ifdef CONFIG_HOTPLUG_CPU
-	case CPU_UP_CANCELED:
-	case CPU_UP_CANCELED_FROZEN:
-		if (!per_cpu(ksoftirqd, hotcpu))
-			break;
-		/* Unbind so it can run.  Fall thru. */
-		kthread_bind(per_cpu(ksoftirqd, hotcpu),
-			     cpumask_any(cpu_online_mask));
 	case CPU_DEAD:
-	case CPU_DEAD_FROZEN: {
-		static const struct sched_param param = {
-			.sched_priority = MAX_RT_PRIO-1
-		};
-
-		p = per_cpu(ksoftirqd, hotcpu);
-		per_cpu(ksoftirqd, hotcpu) = NULL;
-		sched_setscheduler_nocheck(p, SCHED_FIFO, &param);
-		kthread_stop(p);
-		takeover_tasklets(hotcpu);
+	case CPU_DEAD_FROZEN:
+		takeover_tasklets((unsigned long)hcpu);
 		break;
-	}
 #endif /* CONFIG_HOTPLUG_CPU */
- 	}
+	}
 	return NOTIFY_OK;
 }
 
@@ -912,14 +829,19 @@ static struct notifier_block __cpuinitdata cpu_nfb = {
 	.notifier_call = cpu_callback
 };
 
+static struct smp_hotplug_thread softirq_threads = {
+	.store			= &ksoftirqd,
+	.thread_should_run	= ksoftirqd_should_run,
+	.thread_fn		= run_ksoftirqd,
+	.thread_comm		= "ksoftirqd/%u",
+};
+
 static __init int spawn_ksoftirqd(void)
 {
-	void *cpu = (void *)(long)smp_processor_id();
-	int err = cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
-
-	BUG_ON(err != NOTIFY_OK);
-	cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
 	register_cpu_notifier(&cpu_nfb);
+
+	BUG_ON(smpboot_register_percpu_thread(&softirq_threads));
+
 	return 0;
 }
 early_initcall(spawn_ksoftirqd);
