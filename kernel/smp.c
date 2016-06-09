@@ -12,6 +12,7 @@
 #include <linux/gfp.h>
 #include <linux/smp.h>
 #include <linux/cpu.h>
+#include "smpboot.h"
 #include <asm/relaxed.h>
 
 #ifdef CONFIG_USE_GENERIC_SMP_HELPERS
@@ -670,6 +671,8 @@ void __init setup_nr_cpu_ids(void)
 void __init smp_init(void)
 {
 	unsigned int cpu;
+
+        idle_threads_init();
 
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(cpu) {
