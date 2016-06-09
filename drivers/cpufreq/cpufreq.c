@@ -1109,7 +1109,6 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 		policy->user_policy.max = policy->max;
 	}
 	pr_debug("Restoring CPU%d min %d and max %d\n",
-                cpu, policy->min, policy->max);
 
 #endif
 
