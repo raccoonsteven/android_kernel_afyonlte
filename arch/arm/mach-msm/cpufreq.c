@@ -183,6 +183,7 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 			return 0;
 	}
 #endif
+
 	freqs.old = policy->cur;
 	freqs.new = new_freq;
 	freqs.cpu = policy->cpu;

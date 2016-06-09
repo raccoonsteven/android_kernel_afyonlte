@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-export version=ZERO_KERNEL-0.4d-linaro
+export version=ZERO_KERNEL-0.5d-linaro
 
 export TOOLCHAIN=/home/dm47021/Android/toolchains/linaro-4.9.4-cortex-a7/bin/arm-cortex_a7-linux-gnueabihf-
 
@@ -23,7 +23,7 @@ ${txtrst}"
 rm -rf ./$version-DM47021.zip
 rm -rf zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
 
-#make mrproper
+make mrproper
 
 loc=~/.gnome2/nautilus-scripts/SignScripts/
 date=$(date +%Y%m%d-%H:%M:%S)
