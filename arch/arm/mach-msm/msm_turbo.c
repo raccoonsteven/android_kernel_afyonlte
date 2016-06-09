@@ -20,16 +20,18 @@
 #include <linux/module.h>
 #include <linux/cpumask.h>
 
-#ifdef CONFIG_TURBO_BOOST
-#define CPU_MAX_SPEED    1593600
-#endif
+#define MSM_TURBO_VERSION_MAJOR 2
+#define MSM_TURBO_VERSION_MINOR 0
+
+#define CPU_OEM_SPEED    1190400  /*1190.4 Mhz for MSM8226 */    
+#define CPU_MAX_SPEED    1593600  /*1593.6 Mhz for Overclocked MSM8226 */
 
 int msm_turbo(int cpufreq)
 {
-	if (num_online_cpus() > 4) {
-		if (cpufreq > CPU_MAX_SPEED)
-			cpufreq = CPU_MAX_SPEED;
-        }
+	if (num_online_cpus() > 2) {              // Turbo should turn on 
+		if (cpufreq > CPU_OEM_SPEED)      // when cores are online at 1190mhz
+			cpufreq = CPU_MAX_SPEED;  // should boost 3 cores to 1590mhz
+        }               
 	return cpufreq;
 }
 
