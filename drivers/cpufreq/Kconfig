@@ -139,6 +139,16 @@ config CPU_FREQ_DEFAULT_GOV_XPERIENCE
 	help
 	Use the CPUFreq governor 'xperience' as default.
 
+config CPU_FREQ_DEFAULT_GOV_ZEROLAG
+	bool "zerolag"
+	select CPU_FREQ_GOV_ZEROLAG
+	help
+	  Use the CPUFreq governor 'zerolag' as default. This allows
+	  you to get a full dynamic cpu frequency capable system by simply
+	  loading your cpufreq low-level hardware driver,
+          based on the 3.5+ version of interactive,
+          it takes advantage of the new hotplug infrustructure and parked threads.
+
 config CPU_FREQ_DEFAULT_GOV_ZZMOOVE
          bool "zzmoove"
          select CPU_FREQ_GOV_ZZMOOVE
@@ -273,6 +283,26 @@ config CPU_FREQ_GOV_XPERIENCE
 	 depends on CPU_FREQ
 	 help
 	'XPerience' - a "powered and smart" governor
+
+config CPU_FREQ_GOV_ZEROLAG
+	tristate "'zerolag' cpufreq policy governor"
+	help
+	  'ZEROLAG' - This driver adds a dynamic cpufreq policy governor
+	  designed for latency-sensitive workloads.
+
+	  This governor attempts to reduce the latency of clock
+	  increases so that the system is more responsive to
+	  interactive workloads.
+
+          Takes adavantage of the new hotplug introduced in 3.5
+          and parked threads.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_zerolag.
+
+	  For details, take a look at linux/Documentation/cpu-freq.
+
+	  If in doubt, say N.
 
 config CPU_FREQ_GOV_ZZMOOVE
         tristate "'zzmoove' cpufreq governor"
