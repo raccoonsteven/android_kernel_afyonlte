@@ -35,6 +35,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_zerolag.h>
 
+#define ZEROLAG_GOVERNOR_VERSION_MAJOR 1
+#define ZEROLAG_GOVERNOR_VERSION_MINOR 2
+#define ZEROLAG_GOVERNOR_VERSION_TWEAK DM47021 
+
 static int active_count;
 
 struct cpufreq_zerolag_cpuinfo {
@@ -448,6 +452,8 @@ static void cpufreq_zerolag_timer(unsigned long data)
 	cpu_load = loadadjfreq / pcpu->target_freq;
 	pcpu->prev_load = cpu_load;
 	boosted = boost_val || now < boostpulse_endtime;
+
+        cpufreq_notify_utilization(pcpu->policy, cpu_load);
 
 	if (cpu_load >= go_hispeed_load || boosted) {
 		if(is_grid){
