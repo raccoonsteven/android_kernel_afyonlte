@@ -55,6 +55,7 @@ struct cpufreq_zerolag_cpuinfo {
 	int governor_enabled;
 	int prev_load;
 	bool limits_changed;
+        unsigned int nr_timer_resched;
 };
 
 #define MIN_TIMER_JIFFIES 1UL
@@ -432,6 +433,7 @@ static void cpufreq_zerolag_timer(unsigned long data)
 	if (!pcpu->governor_enabled)
 		goto exit;
 
+        pcpu->nr_timer_resched = 0;
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	now = update_load(data);
 	delta_time = (unsigned int)(now - pcpu->cputime_speedadj_timestamp);
@@ -1511,7 +1513,24 @@ static int cpufreq_governor_zerolag(struct cpufreq_policy *policy,
 			 */
 			del_timer_sync(&pcpu->cpu_timer);
 			del_timer_sync(&pcpu->cpu_slack_timer);
-			if (policy->min >= pcpu->target_freq) {
+
+			if (pcpu->nr_timer_resched) {
+				if (pcpu->policy->min >= pcpu->target_freq)
+					pcpu->target_freq = pcpu->policy->min;
+ 				/*
+ 				 * To avoid deferring load evaluation for a
+ 				 * long time rearm the timer for the same jiffy
+ 				 * as it was supposed to fire at, if it has
+ 				 * already been rescheduled once. The timer
+ 				 * start and rescheduling functions aren't used
+ 				 * here so that the timestamps used for load
+ 				 * calculations do not get reset.
+ 				 */
+ 				add_timer_on(&pcpu->cpu_timer, j);
+ 				if (timer_slack_val >= 0 && pcpu->target_freq >
+ 							pcpu->policy->min)
+ 					add_timer_on(&pcpu->cpu_slack_timer, j);
+ 			} else if (policy->min >= pcpu->target_freq) {
 				pcpu->target_freq = policy->min;
 				/*
 				 * Reschedule timer.
@@ -1520,6 +1539,7 @@ static int cpufreq_governor_zerolag(struct cpufreq_policy *policy,
 				 */
 
 				cpufreq_zerolag_timer_start(j, 0);
+                                pcpu->nr_timer_resched++;
 			} else {
 				/*
  				 * Reschedule timer with variable duration.
@@ -1535,6 +1555,7 @@ static int cpufreq_governor_zerolag(struct cpufreq_policy *policy,
  						  expire_time);
  
  				cpufreq_zerolag_timer_start(j, expire_time);
+                                pcpu->nr_timer_resched++;
 			}
 			pcpu->limits_changed = true;
 			up_write(&pcpu->enable_sem);
