@@ -4,7 +4,7 @@
 export version=ZERO_KERNEL-0.5d-linaro
 export TOOLCHAIN=/home/dm47021/Android/toolchains/linaro-4.9.4-cortex-a7/bin/arm-cortex_a7-linux-gnueabihf-
 
-export CPU_CORES=8
+export CPU_CORES=4
 
 # Colorize and add text parameters
 red=$(tput setaf 1) # red
