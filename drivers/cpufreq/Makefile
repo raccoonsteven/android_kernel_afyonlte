@@ -20,6 +20,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_ELEMENTALX)	+= cpufreq_elementalx.o
 obj-$(CONFIG_CPU_FREQ_GOV_HYPER)	+= cpufreq_HYPER.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE)	+= cpufreq_interactive.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTELLIACTIVE)+= cpufreq_intelliactive.o
+obj-$(CONFIG_CPU_FREQ_GOV_REAPER)	+= cpufreq_REAPER.o
 obj-$(CONFIG_CPU_FREQ_GOV_XPERIENCE)	+= cpufreq_xperience.o
 obj-$(CONFIG_CPU_FREQ_GOV_ZEROLAG)	+= cpufreq_zerolag.o
 obj-$(CONFIG_CPU_FREQ_GOV_ZZMOOVE)     	+= cpufreq_zzmoove.o
