@@ -1,8 +1,10 @@
 #!/bin/bash 
 
+# Build Variables
 export version=ZERO_KERNEL-0.5d-linaro
-
 export TOOLCHAIN=/home/dm47021/Android/toolchains/linaro-4.9.4-cortex-a7/bin/arm-cortex_a7-linux-gnueabihf-
+
+export CPU_CORES=8
 
 # Colorize and add text parameters
 red=$(tput setaf 1) # red
@@ -55,7 +57,7 @@ echo -e "${bldblu}
 ${txtrst}" 
 cp zero_afyonlte_defconfig .config
 
-make -j4 ARCH=arm CROSS_COMPILE=$TOOLCHAIN
+make -j$CPU_CORES ARCH=arm CROSS_COMPILE=$TOOLCHAIN
 
 echo -e "${bldgrn} 
       Kernel Built Sucessfully!!
