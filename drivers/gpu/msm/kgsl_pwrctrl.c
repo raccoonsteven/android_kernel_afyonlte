@@ -45,8 +45,8 @@
 #define INIT_UDELAY		200
 #define MAX_UDELAY		2000
 
-#ifdef CONFIG_CPU_FREQ_GOV_SLIM
-int graphics_boost = 4;
+#ifdef CONFIG_CPU_FREQ_GOV_ELEMENTALX
+int graphics_boost = 5;
 #endif
 
 struct clk_pair {
@@ -214,7 +214,7 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 
 
 	trace_kgsl_pwrlevel(device, pwr->active_pwrlevel, pwrlevel->gpu_freq);
-#ifdef CONFIG_CPU_FREQ_GOV_SLIM
+#ifdef CONFIG_CPU_FREQ_GOV_ELEMENTALX
         graphics_boost = pwr->active_pwrlevel;
 #endif
 }

@@ -144,6 +144,13 @@ config CPU_FREQ_DEFAULT_GOV_BARRY_ALLEN
  	select CPU_FREQ_GOV_BARRY_ALLEN
 	help
 
+config CPU_FREQ_DEFAULT_GOV_ELEMENTALX
+	bool "elementalx"
+	select CPU_FREQ_GOV_ELEMENTALX
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Use the CPUFreq governor 'elementalx' as default.
+
 config CPU_FREQ_DEFAULT_GOV_HYPER
 	bool "HYPER"
 	select CPU_FREQ_GOV_HYPER
@@ -158,13 +165,6 @@ config CPU_FREQ_DEFAULT_GOV_INTELLIACTIVE
 	  you to get a full dynamic cpu frequency capable system by simply
 	  loading your cpufreq low-level hardware driver, using the
 	  'interactive' governor for latency-sensitive workloads.
-
-config CPU_FREQ_DEFAULT_GOV_SLIM
- 	bool "slim"
- 	select CPU_FREQ_GOV_SLIM
- 	select CPU_FREQ_GOV_PERFORMANCE
- 	help
- 	  Use the CPUFreq governor 'slim' as default.
 
 config CPU_FREQ_DEFAULT_GOV_XPERIENCE
 	bool "xperience"
@@ -305,6 +305,10 @@ config CPU_FREQ_GOV_BLU_ACTIVE
 config CPU_FREQ_GOV_BARRY_ALLEN
 	tristate "'barry_allen' cpufreq policy governor"
 	help
+
+config CPU_FREQ_GOV_ELEMENTALX
+       tristate "'elementalx' cpufreq policy governor"
+       select CPU_FREQ_TABLE
 
 config CPU_FREQ_GOV_HYPER
 	tristate "'HYPER' cpufreq governor"
