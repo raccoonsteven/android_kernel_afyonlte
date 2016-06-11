@@ -65,6 +65,10 @@ echo -e "${bldgrn}
       Kernel Modules can be found in zfiles/packaging/system/lib/modules
 ${txtrst}"
 
+# Create dir struct
+mkdir zfiles/packaging/system/lib/modules
+mkdir zfiles/packaging/system/lib/modules/pronto
+
 find -name '*.ko' -exec cp -av {} zfiles/packaging/system/lib/modules/ \;
 cp zfiles/packaging/system/lib/modules/pronto_wlan.ko zfiles/packaging/system/lib/modules/pronto/pronto_wlan.ko
 rm -rf zfiles/packaging/system/lib/modules/pronto_wlan.ko
@@ -112,9 +116,11 @@ echo -e "${bldred}
      Cleaning Up Working Dirs
 ${txtrst}"
 
+# Remove dirs after build
 rm -rf zfiles/packaging/boot.img 
 rm -rf zfiles/zImage 
 rm -rf zfiles/zero-krnl.zip
+rm -rf zfiles/packaging/system/lib/modules
 
 # Wait for user input
 echo""
