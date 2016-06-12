@@ -95,7 +95,7 @@ echo -e "${bldcya}
 ${txtrst}" 
 
 cd zfiles
-./mkbootzip.pl ramdisk/zero
+./mkbootzip.pl ramdisk/cm12.1
 
 echo""
 echo -e "${bldcya} 

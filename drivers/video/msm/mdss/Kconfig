@@ -315,6 +315,10 @@ config GET_LCD_ATTACHED
 	bool "check if LCD connected or not and detect panel vendor"
 	default n
 
+config GET_LCD_PCD_DETECTED
+	bool "check if PCD detected or not"
+	default n
+
 config WHITE_PANEL
 	bool "Support normally White Panel"
 	default n
@@ -333,5 +337,9 @@ config CLK_TUNING
 
 config MDP_NEGATIVE_SUPPORT
 	bool "Support MDP negative color"
+	default n
+
+config MDSS_UD_FLIP
+	bool "Support MDSS UD flip"
 	default n
 

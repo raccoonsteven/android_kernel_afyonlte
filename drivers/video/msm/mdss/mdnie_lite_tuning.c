@@ -43,6 +43,8 @@
 
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) // H
 #include "mdnie_lite_tuning_data_hlte.h"
+#elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL) // KS01
+#include "mdnie_lite_tuning_data.h"
 #elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) // F
 #include "mdnie_lite_tuning_data_flte.h"
 #elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) // K
@@ -54,9 +56,9 @@
 /*
 #elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL) // ?
 #include "mdnie_lite_tuning_data_wvga_s6e88a0.h"
-*/
-#elif defined(CONFIG_MACH_JS01LTEDCM) // JS01
+#elif defined(CONFIG_MACH_JS01LTEDCM) || defined(CONFIG_MACH_JS01LTESBM) // JS01
 #include "mdnie_lite_tuning_data_js01.h"
+*/
 #elif defined(CONFIG_FB_MSM_MDSS_SAMSUNG_OCTA_VIDEO_720P_PT_PANEL)
 #include "mdnie_lite_tuning_data_fresco.h"
 #elif defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL) \
@@ -67,8 +69,10 @@
 #elif defined (CONFIG_FB_MSM_MDSS_SHARP_HD_PANEL)
 #include "mdss_ms01_panel.h"
 #include "mdnie_lite_tuning_data_ms01.h"
+#elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL)
+#include "mdnie_lite_tuning_data_klimt.h"
 #else
-#include "mdnie_lite_tuning_data.h"	// KS01
+#include "mdnie_lite_tuning_data.h"
 #endif
 
 #if defined(CONFIG_TDMB)
@@ -137,7 +141,7 @@ struct mdnie_lite_tun_type mdnie_tun_state = {
 #ifdef MDNIE_LITE_MODE
 	.background = 0,
 #else
-	.background = STANDARD_MODE,
+	.background = AUTO_MODE,
 #endif /* MDNIE_LITE_MODE */
 	.outdoor = OUTDOOR_OFF_MODE,
 	.accessibility = ACCESSIBILITY_OFF,
@@ -199,7 +203,7 @@ const char accessibility_name[ACCESSIBILITY_MAX][20] = {
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || \
 	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)||\
 	defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)	|| defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL) ||\
-	defined(CONFIG_MACH_JS01LTEDCM)
+	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL) || defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL)
 	"SCREEN_CURTAIN_MODE",
 #endif
 #endif /* NEGATIVE_COLOR_USE_ACCESSIBILLITY */
@@ -402,7 +406,11 @@ void sending_tuning_cmd(void)
 #if defined(CONFIG_FB_MSM_MDSS_MDP3)
 		mdss_dsi_cmds_send(ctrl_pdata, mdni_tune_cmd, ARRAY_SIZE(mdni_tune_cmd));
 #else
-		mdss_dsi_cmds_send(ctrl_pdata, mdni_tune_cmd, ARRAY_SIZE(mdni_tune_cmd),0);
+#if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL)
+	mdss_dsi_cmds_send(ctrl_pdata, mdni_tune_cmd, ARRAY_SIZE(mdni_tune_cmd), CMD_REQ_SINGLE_TX);
+#else
+	mdss_dsi_cmds_send(ctrl_pdata, mdni_tune_cmd, ARRAY_SIZE(mdni_tune_cmd), 0);
+#endif
 #endif
 
 		mutex_unlock(&mdnie_msd->lock);
@@ -459,6 +467,14 @@ void mDNIe_Set_Mode(void)
 
 	play_speed_1_5 = 0;
 
+#if defined(CONFIG_FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL) // JACTIVE
+	if(mdnie_tun_state.scenario == mDNIe_EMAIL_MODE && \
+		mdnie_tune_value[mdnie_tun_state.scenario][mdnie_tun_state.background][mdnie_tun_state.outdoor][0] == NULL) {
+		mdnie_tun_state.scenario = mDNIe_eBOOK_MODE;
+		DPRINT("EMAIL mode data is null, set eBOOK mode. \n");
+	}
+#endif
+
 	if (mdnie_tun_state.accessibility) {
 		DPRINT(" = ACCESSIBILITY MODE =\n");
 #if defined(CONFIG_FB_MSM_MIPI_VIDEO_WVGA_NT35502_PT_PANEL)
@@ -474,15 +490,26 @@ void mDNIe_Set_Mode(void)
 
 	}
 
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL) \
+	|| defined (CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
 	else if (mdnie_msd->dstat.auto_brightness == 6) {
 		DPRINT("[LOCAL CE] HBM mode! only LOCAL CE tuning\n");
 #if defined(CONFIG_MDNIE_ENHENCED_LOCAL_CE)
 			INPUT_PAYLOAD1(LOCAL_CE_1_ENHENCED);
 			INPUT_PAYLOAD2(LOCAL_CE_2_ENHENCED);
 #else
-			INPUT_PAYLOAD1(LOCAL_CE_1);
-			INPUT_PAYLOAD2(LOCAL_CE_2);
+#if defined (CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
+			if((mdnie_tun_state.scenario == mDNIe_BROWSER_MODE)||(mdnie_tun_state.scenario == mDNIe_eBOOK_MODE))
+			{
+				INPUT_PAYLOAD1(LOCAL_CE_1_TEXT);
+				INPUT_PAYLOAD2(LOCAL_CE_2_TEXT);
+			}
+			else
+#endif
+			{
+				INPUT_PAYLOAD1(LOCAL_CE_1);
+				INPUT_PAYLOAD2(LOCAL_CE_2);
+			}
 #endif
 	}
 #endif
@@ -605,6 +632,8 @@ static ssize_t mode_store(struct device *dev,
 		return size;
 	}
 	backup = mdnie_tun_state.background;
+	if(mdnie_tun_state.background == value)
+		return size;
 	mdnie_tun_state.background = value;
 
 	if (mdnie_tun_state.accessibility == NEGATIVE) {
@@ -649,6 +678,8 @@ static ssize_t scenario_store(struct device *dev,
 	}
 
 	backup = mdnie_tun_state.scenario;
+	if(mdnie_tun_state.scenario == value)
+		return size;
 	mdnie_tun_state.scenario = value;
 
 #if defined(CONFIG_TDMB)
@@ -772,6 +803,8 @@ static ssize_t outdoor_store(struct device *dev,
 	}
 
 	backup = mdnie_tun_state.outdoor;
+	if(mdnie_tun_state.outdoor == value)
+		return size;
 	mdnie_tun_state.outdoor = value;
 
 	if (mdnie_tun_state.accessibility == NEGATIVE) {
@@ -787,6 +820,64 @@ static ssize_t outdoor_store(struct device *dev,
 }
 
 static DEVICE_ATTR(outdoor, 0664, outdoor_show, outdoor_store);
+
+
+#if defined(AUTO_BRIGHTNESS_CABC_FUNCTION)
+
+unsigned int mdss_dsi_show_cabc(void )
+{
+	return msd.dstat.cabc_on;
+}
+void mdss_dsi_store_cabc(unsigned int cabc)
+{
+	struct msm_fb_data_type *mfd;
+	mfd = mdnie_msd->mfd;
+
+	if(mfd->resume_state == MIPI_SUSPEND_STATE){
+		pr_err("%s: panel power off no bl ctrl\n", __func__);
+		return;
+	}
+
+	msd.dstat.cabc_on = cabc;
+
+	pr_info("%s : CABC : %d\n", __func__,msd.dstat.cabc_on);
+
+	if(mfd->resume_state == MIPI_RESUME_STATE)
+		mipi_samsung_cabc_onoff(cabc);
+}
+
+
+static ssize_t cabc_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned int cabc;
+	cabc = mdss_dsi_show_cabc();
+	pr_info("%s : CABC : %d\n", __func__, cabc);
+	return cabc;
+
+}
+
+static ssize_t cabc_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+
+	unsigned char cabc;
+	cabc = mdss_dsi_show_cabc();
+
+	if (sysfs_streq(buf, "1") && !cabc)
+		cabc = true;
+	else if (sysfs_streq(buf, "0") && cabc)
+		cabc = false;
+	else
+		pr_info("%s: Invalid argument!!", __func__);
+	mdss_dsi_store_cabc(cabc);
+
+	return size;
+
+}
+static DEVICE_ATTR(cabc, 0664, cabc_show, cabc_store);
+#endif
+
 
 #if 0 // accessibility
 static ssize_t negative_show(struct device *dev,
@@ -808,7 +899,8 @@ static ssize_t negative_store(struct device *dev,
 	DPRINT
 	    ("negative_store, input value = %d\n",
 	     value);
-
+	if(mdnie_tun_state.accessibility == value)
+		return size;
 	mdnie_tun_state.accessibility = value;
 
 	mDNIe_Set_Mode();
@@ -894,10 +986,14 @@ static ssize_t accessibility_store(struct device *dev,
 	backup = mdnie_tun_state.accessibility;
 
 	if (cmd_value == NEGATIVE) {
+		if(mdnie_tun_state.accessibility == NEGATIVE)
+			return size;
 		mdnie_tun_state.accessibility = NEGATIVE;
 	}
 #ifndef	NEGATIVE_COLOR_USE_ACCESSIBILLITY
 	else if (cmd_value == COLOR_BLIND) {
+		if(mdnie_tun_state.accessibility == COLOR_BLIND)
+			return size;
 		mdnie_tun_state.accessibility = COLOR_BLIND;
 
 		#if defined (CONFIG_FB_MSM_MDSS_SHARP_HD_PANEL)
@@ -911,13 +1007,17 @@ static ssize_t accessibility_store(struct device *dev,
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || \
 	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL) ||\
 	defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL) || defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL) ||\
-	defined(CONFIG_MACH_JS01LTEDCM)
+	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL) || defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL)
 	else if (cmd_value == SCREEN_CURTAIN) {
+		if(mdnie_tun_state.accessibility == SCREEN_CURTAIN)
+			return size;
 		mdnie_tun_state.accessibility = SCREEN_CURTAIN;
 	}
 #endif
 #endif /* NEGATIVE_COLOR_USE_ACCESSIBILLITY */
 	else if (cmd_value == ACCESSIBILITY_OFF) {
+		if(mdnie_tun_state.accessibility == ACCESSIBILITY_OFF)
+			return size;
 		mdnie_tun_state.accessibility = ACCESSIBILITY_OFF;
 	} else
 		pr_info("%s ACCESSIBILITY_MAX", __func__);
@@ -1212,6 +1312,13 @@ void init_mdnie_class(void)
 		pr_err("Failed to create device file(%s)!\n",
 	       dev_attr_outdoor.attr.name);
 
+#if defined(AUTO_BRIGHTNESS_CABC_FUNCTION)
+	if (device_create_file
+		(tune_mdnie_dev, &dev_attr_cabc) < 0)
+		pr_err("Failed to create device file(%s)!\n",
+		   dev_attr_cabc.attr.name);
+#endif
+
 #if 0 // accessibility
 	if (device_create_file
 		(tune_mdnie_dev, &dev_attr_negative) < 0)
@@ -1294,7 +1401,8 @@ static char coordinate_data[][coordinate_data_size] = {
 	{0xf9, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_9 */
 };
 
-#elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)
+#elif defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL) || \
+	defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL)
 
 #define scr_wr_addr 122
 
@@ -1316,8 +1424,79 @@ static char coordinate_data[][coordinate_data_size] = {
 	{0xfb, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_9 */
 };
 
+#elif defined (CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
+
+#define scr_wr_addr 36
+
+#define F1(x,y) ((y)-((164*(x))/151)+8)
+#define F2(x,y) ((y)-((70*(x))/67)-7)
+#define F3(x,y) ((y)+((181*(x))/35)-18852)
+#define F4(x,y) ((y)+((157*(x))/52)-12055)
+
+static char coordinate_data[][coordinate_data_size] = {
+	{0xff, 0x00, 0xff, 0x00, 0xff, 0x00}, /* dummy */
+	{0xff, 0x00, 0xfa, 0x00, 0xfa, 0x00}, /* Tune_1 */
+	{0xff, 0x00, 0xfb, 0x00, 0xfe, 0x00}, /* Tune_2 */
+	{0xfc, 0x00, 0xfb, 0x00, 0xff, 0x00}, /* Tune_3 */
+	{0xff, 0x00, 0xfe, 0x00, 0xfb, 0x00}, /* Tune_4 */
+	{0xff, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_5 */
+	{0xfb, 0x00, 0xfc, 0x00, 0xff, 0x00}, /* Tune_6 */
+	{0xfc, 0x00, 0xff, 0x00, 0xfa, 0x00}, /* Tune_7 */
+	{0xfb, 0x00, 0xff, 0x00, 0xfb, 0x00}, /* Tune_8 */
+	{0xfb, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_9 */
+};
+
+#elif defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL)
+extern int flip;
+
+#define scr_wr_addr 36
+
+#define F1(x,y) ((y)-((164*(x))/151)+8)
+#define F2(x,y) ((y)-((70*(x))/67)-7)
+#define F3(x,y) ((y)+((181*(x))/35)-18852)
+#define F4(x,y) ((y)+((157*(x))/52)-12055)
+
+static char coordinate_data_main[][coordinate_data_size] = {
+	{0xff, 0x00, 0xff, 0x00, 0xff, 0x00}, /* dummy */
+	{0xff, 0x00, 0xfa, 0x00, 0xfa, 0x00}, /* Tune_1 */
+	{0xff, 0x00, 0xfb, 0x00, 0xfe, 0x00}, /* Tune_2 */
+	{0xfc, 0x00, 0xfb, 0x00, 0xff, 0x00}, /* Tune_3 */
+	{0xff, 0x00, 0xfe, 0x00, 0xfb, 0x00}, /* Tune_4 */
+	{0xff, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_5 */
+	{0xfb, 0x00, 0xfc, 0x00, 0xff, 0x00}, /* Tune_6 */
+	{0xfc, 0x00, 0xff, 0x00, 0xfa, 0x00}, /* Tune_7 */
+	{0xfb, 0x00, 0xff, 0x00, 0xfb, 0x00}, /* Tune_8 */
+	{0xfa, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_9 */
+};
+
+static char coordinate_data_sub[][coordinate_data_size] = {
+	{0xff, 0x00, 0xff, 0x00, 0xff, 0x00}, /* dummy */
+	{0xff, 0x00, 0xfa, 0x00, 0xfa, 0x00}, /* Tune_1 */
+	{0xff, 0x00, 0xfb, 0x00, 0xfe, 0x00}, /* Tune_2 */
+	{0xfc, 0x00, 0xfb, 0x00, 0xff, 0x00}, /* Tune_3 */
+	{0xff, 0x00, 0xfe, 0x00, 0xfb, 0x00}, /* Tune_4 */
+	{0xff, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_5 */
+	{0xfb, 0x00, 0xfc, 0x00, 0xff, 0x00}, /* Tune_6 */
+	{0xfc, 0x00, 0xff, 0x00, 0xfa, 0x00}, /* Tune_7 */
+	{0xfb, 0x00, 0xff, 0x00, 0xfb, 0x00}, /* Tune_8 */
+	{0xfa, 0x00, 0xff, 0x00, 0xff, 0x00}, /* Tune_9 */
+};
+
+static char coordinate_data[][coordinate_data_size] = {
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* dummy */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_1 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_2 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_3 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_4 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_5 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_6 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_7 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_8 */
+	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, /* Tune_9 */
+};
+
 #else
-#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG_OCTA_VIDEO_720P_PT_PANEL) ||defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL) \
+#if defined(CONFIG_FB_MSM_MDSS_SAMSUNG_OCTA_VIDEO_720P_PT_PANEL) \
 	|| defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL)
 #define scr_wr_addr 36
 #endif
@@ -1344,8 +1523,19 @@ static char coordinate_data[][coordinate_data_size] = {
 void coordinate_tunning(int x, int y)
 {
 	int tune_number;
-
+#if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL) || defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL)
+	int i, j;
+#endif
 	tune_number = 0;
+
+#if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL)
+	pr_info("%s : coordinate for %s panel\n", __func__, flip?"main":"sub");
+
+	if (flip)
+		memcpy(coordinate_data, coordinate_data_main, 60);
+	else
+		memcpy(coordinate_data, coordinate_data_sub, 60);
+#endif
 
 	if (F1(x,y) > 0) {
 		if (F3(x,y) > 0) {
@@ -1379,6 +1569,21 @@ void coordinate_tunning(int x, int y)
 	}
 
 	pr_info("%s x : %d, y : %d, tune_number : %d", __func__, x, y, tune_number);
+#if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL) || defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL)
+	for(i = 0; i < mDNIe_eBOOK_MODE; i++)
+	{
+		for(j = 0; j < AUTO_MODE; j++)
+		{
+			if(mdnie_tune_value[i][j][0][1] != NULL)
+			{
+				if((mdnie_tune_value[i][j][0][1][scr_wr_addr] == 0xff) && (mdnie_tune_value[i][j][0][1][scr_wr_addr+2] == 0xff) && (mdnie_tune_value[i][j][0][1][scr_wr_addr+4] == 0xff))
+				{
+					memcpy(&mdnie_tune_value[i][j][0][1][scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
+				}
+			}
+		}
+	}
+#else
 	memcpy(&DYNAMIC_BROWSER_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 	memcpy(&DYNAMIC_GALLERY_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 	memcpy(&DYNAMIC_UI_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
@@ -1401,7 +1606,7 @@ void coordinate_tunning(int x, int y)
 	memcpy(&AUTO_VT_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
 
 	memcpy(&CAMERA_2[scr_wr_addr], &coordinate_data[tune_number][0], coordinate_data_size);
-
+#endif
 
 }
 #endif /* COORDINATE_DATA_NONE */

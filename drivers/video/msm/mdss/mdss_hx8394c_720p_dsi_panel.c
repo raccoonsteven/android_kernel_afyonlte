@@ -206,6 +206,10 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	led_pwm1[1] = mdss_dsi_panel_pwm_scaling(level);
 
+	/*Under BL_MIN_BRIGHTNESS , Set LDI brightness value as 0*/
+	if (level < BL_MIN_BRIGHTNESS)
+		led_pwm1[1] = 0;
+
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = &backlight_cmd;
 	cmdreq.cmds_cnt = 1;
@@ -764,7 +768,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		int rc, i, len;
 		const char *data;
 		static const char *pdest;
-		static const char *on_cmds_state, *off_cmds_state;
 		struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 		rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 		if (rc) {
@@ -1064,29 +1067,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_duty_82,
 			"samsung,cabc-duty-82", "qcom,mdss-dsi-on-command-state");
 #endif
-
-		on_cmds_state = of_get_property(np,
-					"qcom,mdss-dsi-on-command-state", NULL);
-		if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) {
-			ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-		} else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) {
-			ctrl_pdata->dsi_on_state = DSI_HS_MODE;
-		} else {
-			pr_debug("%s: ON cmds state not specified. Set Default\n",
-								__func__);
-			ctrl_pdata->dsi_on_state = DSI_LP_MODE;
-		}
-
-		off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL);
-		if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) {
-			ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-		} else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) {
-			ctrl_pdata->dsi_off_state = DSI_HS_MODE;
-		} else {
-			pr_debug("%s: ON cmds state not specified. Set Default\n",
-								__func__);
-			ctrl_pdata->dsi_off_state = DSI_LP_MODE;
-		}
 
 		return 0;
 	error:
